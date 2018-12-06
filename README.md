@@ -1,2 +1,2 @@
 # lenses-udf-example
-Example for Lenses User Defined Functions for LSQL
+Example for User Defined Functions for Lenses SQL engine
