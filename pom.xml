@@ -24,9 +24,9 @@
 
     <dependencies>
         <dependency>
-            <groupId>io.lenses.samsql</groupId>
-            <artifactId>samsql-udf_2.12</artifactId>
-            <version>1.0.952</version>
+            <groupId>com.landoop</groupId>
+            <artifactId>lenses-sql-udf</artifactId>
+            <version>1.0.0</version>
         </dependency>
         <dependency>
             <groupId>ch.hsr</groupId>
