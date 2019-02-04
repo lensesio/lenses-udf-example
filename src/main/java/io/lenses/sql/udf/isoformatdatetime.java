@@ -8,7 +8,7 @@ import java.time.format.DateTimeFormatter;
 /**
  * Formats a timestamp representing milliseconds since the unix epoch as an ISO Date Time formatted string.
  */
-public class isoformatdatetimestring implements UserDefinedFunction1 {
+public class isoformatdatetime implements UserDefinedFunction1 {
 
     @Override
     public Object evaluate(Object o) {
