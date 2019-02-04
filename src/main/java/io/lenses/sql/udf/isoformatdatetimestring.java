@@ -1,6 +1,4 @@
-package io.lenses.udf.sql;
-
-import io.lenses.sql.udf.UserDefinedFunction1;
+package io.lenses.sql.udf;
 
 import java.time.Instant;
 import java.time.OffsetDateTime;
