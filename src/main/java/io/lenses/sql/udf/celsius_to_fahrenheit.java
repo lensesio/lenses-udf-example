@@ -1,6 +1,6 @@
 package io.lenses.sql.udf;
 
-class celsius_to_fahrenheit implements UserDefinedFunction1 {
+public class celsius_to_fahrenheit implements UserDefinedFunction1 {
 
     @Override
     public Object evaluate(Object arg1) {
