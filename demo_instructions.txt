@@ -1,0 +1,225 @@
+Topics/Schemas to create ahead of time
+------------------------------------------
+topic: 'submitted_orders'
+key:
+{
+  "type" : "record",
+  "name" : "orderId",
+  "namespace" : "com.celonis.example",
+  "fields":  [
+     {"name": "id", "type": "string"}
+ ]
+}
+value:
+{
+  "type" : "record",
+  "name" : "order",
+  "namespace" : "com.celonis.example",
+  "fields":  [
+     {"name": "client", "type": "string"},
+	 {"name": "created_at", "type": {"type": "long", "logicalType": "timestamp-millis"}},
+     {"name": "line_items", "type": {
+        "type": "array",
+        "items": {
+            "type": "record",
+            "name": "line_item",
+            "namespace": "com.celonis.example",
+            "fields": [
+                {"name": "item_id", "type": "string"},
+                {"name": "item_description", "type": "string"},
+                {"name": "item_price", "type": "double"},
+                {"name": "item_qty", "type": "int"}
+            ]
+        }
+     } }
+ ]
+}
+example record:
+[
+    {
+      "key": {"id": "order01"},
+      "value": {
+         "client": "mark@celonis",
+         "created_at": 1647968442656,
+		"line_items": [
+		  {
+			"item_id": "item001",
+			"item_description": "headphones",
+			"item_price": 300.00,
+			"item_qty": 1
+		  },
+		  {
+			"item_id": "item002",
+			"item_description": "tablet",
+			"item_price": 450.00,
+			"item_qty": 1
+		  }
+		]
+      }
+    }
+]
+------------------------------------------------------
+topic: 'order_item_cancellation'
+key:
+{
+  "type": "record",
+  "name": "cancellation_id",
+  "namespace": "com.celonis.example",
+  "fields": [
+    {
+      "name": "id",
+      "type": "string"
+    }
+  ]
+}
+value:
+{
+  "type": "record",
+  "name": "cancellation",
+  "namespace": "com.celonis.example",
+  "fields": [
+    {"name": "order_id", "type": "string"},
+    {"name": "item_id", "type": "string"},
+    {"name": "created_at", "type": {"type": "long", "logicalType": "timestamp-millis"}}
+  ]
+}
+example record:
+[
+    {
+      "key": {"id": "cancellation_01"},
+      "value": {
+        "item_id": "item002",
+        "order_id": "order01",
+		"created_at": 1648073037184
+      }
+    }
+]
+-----------------------------------------------------
+topic: 'payments_received'
+key:
+{
+  "type": "record",
+  "name": "payment_id",
+  "namespace": "com.celonis.example",
+  "fields": [
+    {"name": "id", "type": "string"}
+  ]
+}
+value:
+    {
+      "type": "record",
+      "name": "payment_received",
+      "namespace": "com.celonis.example",
+      "fields": [
+        {"name": "order_id","type": "string"}
+      ]
+    }
+example record:
+[
+    {
+      "key": {"id": "payment_01"},
+      "value": {
+        "order_id": "order01"
+      }
+    }
+]
+
+-----------------------------------------
+Create processor: [001] Order Items
+
+SET defaults.topic.autocreate=true;
+
+INSERT INTO submitted_orders_items
+SELECT STREAM
+  concat(line_item.item_id,'-',so._key.id) as _key.id,
+  line_item.*,
+  so._key.id as order_id,
+  so.client as client,
+  so.created_at as created_at
+FROM submitted_orders so LATERAL so.line_items AS line_item
+;
+
+INSERT INTO audit_log
+SELECT STREAM
+  UUID() as _key.id,
+  o._key.id as order_id,
+  'CREATED' as status,
+  o.created_at as order_created_at,
+  now() as audit_created_at
+FROM submitted_orders o
+-----------------------------------------------------------
+Create Processor:  [002] Waiting payment and cancellations
+
+SET defaults.topic.autocreate=true;
+WITH cancellations_rk AS (
+  SELECT STREAM
+  	concat(oi.item_id, '-' ,oi.order_id) as _key.id,
+  	*
+  FROM order_item_cancellation oi
+);
+
+
+WITH cancellation_table AS (
+  SELECT TABLE * FROM cancellations_rk
+);
+
+INSERT INTO items_awaiting_payment
+SELECT TABLE
+	so.*,
+    CASE
+ 	 WHEN ISNULL(ct._key) THEN 'WAITING_PAYMENT'
+     ELSE 'CANCELLED'
+    END as status
+FROM
+  submitted_orders_items so LEFT JOIN
+  cancellation_table ct ON ct._key.id = so._key.id;
+---------------------------------------------------------
+Create processor: [003] Invoice Requests
+
+SET defaults.topic.autocreate=true;
+INSERT INTO invoice_creation
+SELECT TABLE
+  id_aware_collect(i._value) as invoice_items,
+  SUM(
+    CASE
+	 WHEN status != 'CANCELLED' THEN item_qty * item_price
+	 ELSE 0.0
+	END
+  ) as invoice_total,
+  now() as created_at,
+  order_id as order_id
+FROM items_awaiting_payment i
+GROUP BY order_id as order
+;
+
+INSERT INTO audit_log
+SELECT STREAM
+  CASE
+   WHEN sizeof(distinct_items) = 1 AND distinct_items[0] = 'CANCELLED' THEN 'CANCELLED'
+   ELSE 'WAITING_PAYMENT'
+  END as status,
+  order_id as order_id,
+  now() as audit_created_at
+FROM (
+  SELECT STREAM
+    deduplicate_string(map_string_field(invoice_items, "status")) as distinct_items,
+   *
+  FROM
+  invoice_creation
+);
+--------------------------------------------------------
+
+
+
+--------------------------------
+Create Processor: [O2C] 003 Create Receipt (TODO)
+
+SET defaults.topic.autocreate=true;
+
+INSERT INTO receipt_request
+SELECT TABLE *
+ FROM
+ invoice_requests invoice LEFT JOIN
+ payments_received payments ON invoice._key = payments.order_id
+;
+
