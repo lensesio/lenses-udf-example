@@ -25,6 +25,11 @@ public class id_aware_collect implements UserDefinedTableAggregateFunction {
                 put("client", DataType.ltString());
                 put("created_at", DataType.ltTimestampMillis());
                 put("status", DataType.ltString());
+                try {
+                    put("cancelation_timestamp", DataType.ltOptional(DataType.ltTimestampMillis()));
+                } catch (UdfException e) {
+                    e.printStackTrace();
+                }
             }}
     );
 
