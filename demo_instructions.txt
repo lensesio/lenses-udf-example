@@ -248,4 +248,26 @@ FROM receipt_request
 
 
 
+-------------------------------
+Create Processor: [005] Notify Payment Missing
+
+SET defaults.topic.autocreate=true;
+
+WITH creation AS(
+	SELECT STREAM * FROM audit_log WHERE status = 'CREATED'
+);
+
+WITH payed AS (
+	SELECT STREAM * FROM audit_log WHERE status = 'PAYED'
+);
+
+INSERT INTO notify_unpayed
+SELECT STREAM
+ 'UNPAYED' as warning,
+  *
+FROM
+  creation LEFT JOIN payed
+WITHIN 30s
+WHERE ISNULL(payed._key)
+;
 
