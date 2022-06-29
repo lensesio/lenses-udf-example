@@ -49,7 +49,7 @@ public class celsius_to_fahrenheit implements UserDefinedFunction1 {
     }
 
     private OptionalValue evaluateInternal(Double celsius) throws UdfException {
-        double fahrenheit = celsius * 1.8 + 32;
+        double fahrenheit = celsius;
         return OptionalValue.of(new DoubleValue(Math.round(fahrenheit * 100.0)/ 100.0));
     }
 

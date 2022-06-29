@@ -1,6 +1,7 @@
 package io.lenses.sql.udaf;
 
 import io.lenses.sql.udf.UdfException;
+import io.lenses.sql.udf.count_double;
 import io.lenses.sql.udf.datatype.DataType;
 import io.lenses.sql.udf.value.LongValue;
 import io.lenses.sql.udf.value.Value;

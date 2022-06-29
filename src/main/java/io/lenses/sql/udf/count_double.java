@@ -1,4 +1,4 @@
-package io.lenses.sql.udaf;
+package io.lenses.sql.udf;
 
 import io.lenses.sql.udf.FinalStep;
 import io.lenses.sql.udf.UdfException;
